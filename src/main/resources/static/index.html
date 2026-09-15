@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador de Tarefas (CRUD Test)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f4f7f6;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        h1, h2 {
+            margin-bottom: 20px;
+            color: #2c3e50;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input[type="text"], input[type="number"], textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .checkbox-group input {
+            width: 18px;
+            height: 18px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .btn-submit { background-color: #2ec4b6; color: white; }
+        .btn-submit:hover { background-color: #20968b; }
+
+        .btn-cancel { background-color: #e71d36; color: white; display: none; }
+        .btn-cancel:hover { background-color: #b81428; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 25px;
+        }
+
+        th, td {
+            border: 1px solid #e0e0e0;
+            padding: 12px;
+            text-align: left;
+        }
+
+        th { background-color: #f8f9fa; }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+        }
+
+        .status-concluida { background-color: #2ec4b6; }
+        .status-pendente { background-color: #ff9f1c; }
+
+        .actions button {
+            padding: 5px 10px;
+            font-size: 12px;
+            margin-right: 5px;
+        }
+
+        .btn-edit { background-color: #ff9f1c; color: white; }
+        .btn-delete { background-color: #e71d36; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Testar CRUD Tarefas</h1>
+
+    <!-- Formulário -->
+    <form id="task-form">
+        <input type="hidden" id="task-id">
+
+        <div class="form-group">
+            <label for="titulo">Título</label>
+            <input type="text" id="titulo" required placeholder="Ex: Comprar mantimentos">
+        </div>
+
+        <div class="form-group">
+            <label for="descricao">Descrição</label>
+            <textarea id="descricao" rows="3" placeholder="Ex: Comprar leite, pão e café"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="valor">Valor (R$)</label>
+            <input type="number" id="valor" step="0.01" placeholder="Ex: 50.00">
+        </div>
+
+        <div class="form-group checkbox-group">
+            <input type="checkbox" id="concluida">
+            <label for="concluida" style="margin-bottom:0">Concluída</label>
+        </div>
+
+        <div class="btn-group">
+            <button type="submit" id="btn-save" class="btn-submit">Salvar Tarefa</button>
+            <button type="button" id="btn-cancel" class="btn-cancel" onclick="resetForm()">Cancelar</button>
+        </div>
+    </form>
+
+    <!-- Tabela de Lista -->
+    <h2 style="margin-top: 30px;">Lista de Tarefas</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Título</th>
+                <th>Descrição</th>
+                <th>Valor</th>
+                <th>Status</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody id="tasks-table-body">
+            <!-- Dados inseridos dinamicamente pelo JS -->
+        </tbody>
+    </table>
+</div>
+
+<script>
+    //const API_URL = "http://localhost:8080/api/tasks";
+    const API_URL = "/api/tasks";
+
+    document.addEventListener("DOMContentLoaded", fetchTasks);
+
+    const form = document.getElementById("task-form");
+    const taskIdInput = document.getElementById("task-id");
+    const tituloInput = document.getElementById("titulo");
+    const descricaoInput = document.getElementById("descricao");
+    const valorInput = document.getElementById("valor");
+    const concluidaInput = document.getElementById("concluida");
+    const btnCancel = document.getElementById("btn-cancel");
+    const btnSave = document.getElementById("btn-save");
+
+    // BUSCAR TODAS AS TAREFAS (GET)
+    async function fetchTasks() {
+        try {
+            const response = await fetch(API_URL);
+            const tasks = await response.json();
+            renderTable(tasks);
+        } catch (error) {
+            console.error("Erro ao buscar tarefas:", error);
+            alert("Erro ao conectar com a API. Verifique se o servidor Spring Boot está rodando em http://localhost:8080.");
+        }
+    }
+
+    // RENDERIZAR TABELA
+    function renderTable(tasks) {
+        const tbody = document.getElementById("tasks-table-body");
+        tbody.innerHTML = "";
+
+        tasks.forEach(task => {
+            const row = document.createElement("tr");
+
+            const valorFormatado = task.valor != null 
+                ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(task.valor) 
+                : "R$ 0,00";
+
+            row.innerHTML = `
+                <td>${task.id}</td>
+                <td><strong>${escapeHtml(task.titulo || '')}</strong></td>
+                <td>${escapeHtml(task.descricao || '')}</td>
+                <td>${valorFormatado}</td>
+                <td>
+                    <span class="status-badge ${task.concluida ? 'status-concluida' : 'status-pendente'}">
+                        ${task.concluida ? 'Concluída' : 'Pendente'}
+                    </span>
+                </td>
+                <td class="actions">
+                    <button class="btn-edit" onclick="editTask(${task.id}, '${escapeHtml(task.titulo)}', '${escapeHtml(task.descricao)}', ${task.valor}, ${task.concluida})">Editar</button>
+                    <button class="btn-delete" onclick="deleteTask(${task.id})">Excluir</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    // SALVAR / ATUALIZAR (POST / PATCH)
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const id = taskIdInput.value;
+        const taskData = {
+            titulo: tituloInput.value,
+            descricao: descricaoInput.value,
+            valor: valorInput.value ? parseFloat(valorInput.value) : 0,
+            concluida: concluidaInput.checked
+        };
+
+        try {
+            let response;
+            if (id) {
+                // Atualizar (PATCH)
+                response = await fetch(`${API_URL}/${id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(taskData)
+                });
+            } else {
+                // Criar (POST)
+                response = await fetch(API_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(taskData)
+                });
+            }
+
+            if (response.ok) {
+                resetForm();
+                fetchTasks();
+            } else {
+                alert("Erro ao salvar tarefa!");
+            }
+        } catch (error) {
+            console.error("Erro ao salvar:", error);
+        }
+    });
+
+    // PREENCHER FORMULÁRIO PARA EDIÇÃO
+    function editTask(id, titulo, descricao, valor, concluida) {
+        taskIdInput.value = id;
+        tituloInput.value = titulo;
+        descricaoInput.value = descricao;
+        valorInput.value = valor !== 'null' ? valor : '';
+        concluidaInput.checked = concluida;
+
+        btnSave.textContent = "Atualizar Tarefa";
+        btnCancel.style.display = "block";
+    }
+
+    // DELETAR TAREFA (DELETE)
+    async function deleteTask(id) {
+        if (confirm(`Tem certeza que deseja excluir a tarefa ID ${id}?`)) {
+            try {
+                const response = await fetch(`${API_URL}/${id}`, {
+                    method: "DELETE"
+                });
+
+                if (response.ok) {
+                    fetchTasks();
+                } else {
+                    alert("Erro ao deletar tarefa.");
+                }
+            } catch (error) {
+                console.error("Erro ao deletar:", error);
+            }
+        }
+    }
+
+    // LIMPAR FORMULÁRIO
+    function resetForm() {
+        taskIdInput.value = "";
+        form.reset();
+        btnSave.textContent = "Salvar Tarefa";
+        btnCancel.style.display = "none";
+    }
+
+    // Auxiliar para evitar problemas com aspas nas strings
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    }
+</script>
+
+</body>
+</html>
